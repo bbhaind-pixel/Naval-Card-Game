@@ -2,6 +2,9 @@
    GAME STATE
 ========================= */
 
+let playerNation = null;
+let enemyNation  = null;
+
 let turn = 1;
 
 let currentTurn = "player";
@@ -30,6 +33,153 @@ let enemySupport = [];
 let enemyFrontline = [];
 
 let enemyFleetHP = 40;
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function highlightAttack(attacker, defender) {
+  // We re-render so we need a quick way to mark them.
+  // For now we just force a short visual by temporarily storing flags.
+  attacker._isAttacking = true;
+  defender._isDefending = true;
+  renderBoard();
+
+  setTimeout(() => {
+    attacker._isAttacking = false;
+    defender._isDefending = false;
+  }, 500);
+}
+
+function giveTorpedoStrike(owner) {
+  // owner is either "player" or "enemy"
+  const torpedo = cloneCard(
+    NATIONS.france.cards.find(c => c.name === "Torpedo Strike")
+  );
+
+  if (owner === "player") {
+    if (playerHand.length < 6) playerHand.push(torpedo);
+  } else {
+    if (enemyHand.length < 6) enemyHand.push(torpedo);
+  }
+}
+
+async function useAbilityCard(card, owner) {
+  const isPlayer = owner === "player";
+  const hand = isPlayer ? playerHand : enemyHand;
+  const energyKey = isPlayer ? "playerEnergy" : "enemyEnergy";
+
+  if (!hand.includes(card)) return;
+  if ((isPlayer ? playerEnergy : enemyEnergy) < card.deployCost) return;
+
+  // Pay cost and discard
+  if (isPlayer) {
+    playerEnergy -= card.deployCost;
+    playerHand = playerHand.filter(c => c !== card);
+  } else {
+    enemyEnergy -= card.deployCost;
+    enemyHand = enemyHand.filter(c => c !== card);
+  }
+
+  // Big reveal
+  await showAbilityCard(card);
+
+  // Effects
+if (card.name === "Chariot") {
+  enemyFleetHP -= 10;
+  enemySupport.forEach(ship => ship.currentDefense -= 2);
+  cleanupDestroyed();
+}
+
+if (card.name === "Torpedo Strike") {
+  const targets = isPlayer
+    ? [...enemyFrontline, ...enemySupport]
+    : [...playerFrontline, ...playerSupport];
+
+  if (targets.length > 0) {
+    targets.sort((a, b) => (b.deployCost || 0) - (a.deployCost || 0));
+    targets[0].currentDefense = 0;
+    cleanupDestroyed();
+  }
+}
+
+if (card.name === "Battle For Koh Chang") {
+  const targets = isPlayer
+    ? [...enemySupport, ...enemyFrontline]
+    : [...playerSupport, ...playerFrontline];
+
+  targets.forEach(ship => {
+    ship.currentDefense -= 5;
+  });
+  cleanupDestroyed();
+}
+
+selectedCard = null;
+renderBoard();
+}
+
+function showAbilityCard(card, duration = 2800) {
+  return new Promise(resolve => {
+    // Create overlay
+    const overlay = document.createElement("div");
+    overlay.id = "ability-overlay";
+    overlay.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9000;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    `;
+
+    // The big card
+    const bigCard = document.createElement("div");
+    bigCard.className = `card ${card.nation.toLowerCase()} ${card.rarity}`;
+    if (card.faction) bigCard.classList.add(card.faction.toLowerCase());
+
+    bigCard.style.cssText = `
+      width: 220px;
+      height: 300px;
+      font-size: 1.1em;
+      transform: scale(0.7);
+      transition: transform 0.45s ease, opacity 0.45s ease;
+      opacity: 0;
+      text-align: center;
+      padding: 16px;
+    `;
+
+    bigCard.innerHTML = `
+      <div class="cost" style="font-size:18px; width:36px; height:36px;">${card.deployCost}</div>
+      <h3 style="margin-top:40px; font-size:22px;">${card.name}</h3>
+      <p style="margin-top:20px; font-size:15px; line-height:1.4;">${card.ability}</p>
+    `;
+
+    overlay.appendChild(bigCard);
+    document.body.appendChild(overlay);
+
+    // Animate in
+    requestAnimationFrame(() => {
+      overlay.style.opacity = "1";
+      bigCard.style.opacity = "1";
+      bigCard.style.transform = "scale(1)";
+    });
+
+    // Animate out after duration
+    setTimeout(() => {
+      overlay.style.opacity = "0";
+      bigCard.style.transform = "scale(0.8)";
+      bigCard.style.opacity = "0";
+
+      setTimeout(() => {
+        overlay.remove();
+        resolve();
+      }, 450);
+    }, duration);
+  });
+}
 
 /* =========================
    DOM
@@ -146,6 +296,13 @@ deck.length === 0
 return;
 }
 
+if (
+hand.length >= 6
+) {
+
+return;
+}
+
 hand.push(
 deck.pop()
 );
@@ -155,131 +312,27 @@ deck.pop()
    START GAME
 ========================= */
 
-function startGame() {
+function startGame(playerNationId = "britain", enemyNationId = "france") {
 
-/* PLAYER DECK */
+  playerNation = NATIONS[playerNationId];
+  enemyNation  = NATIONS[enemyNationId];
 
-playerDeck = [
+  // Player deck
+  playerDeck = playerNation.cards.map(card => cloneCard(card));
 
-cloneCard(
-britishCards[0]
-),
+  // Enemy deck
+  enemyDeck = enemyNation.cards.map(card => cloneCard(card));
 
-cloneCard(
-britishCards[1]
-),
+  shuffle(playerDeck);
+  shuffle(enemyDeck);
 
-cloneCard(
-britishCards[2]
-),
+  // Starting hand
+  for (let i = 0; i < 1; i++) {
+    drawCard(playerDeck, playerHand);
+    drawCard(enemyDeck, enemyHand);
+  }
 
-cloneCard(
-britishCards[3]
-),
-
-cloneCard(
-britishCards[4]
-),
-
-cloneCard(
-britishCards[5]
-),
-
-cloneCard(
-britishCards[6]
-),
-
-cloneCard(
-britishCards[7]
-),
-
-cloneCard(
-britishCards[8]
-),
-
-cloneCard(
-britishCards[9]
-),
-
-cloneCard(
-britishCards[10]
-),
-
-cloneCard(
-britishCards[11]
-),
-
-cloneCard(
-britishCards[12]
-),
-
-cloneCard(
-britishCards[13]
-),
-
-cloneCard(
-britishCards[14]
-)
-
-];
-
-/* ENEMY DECK */
-
-enemyDeck = [
-
-cloneCard(
-frenchCards[0]
-),
-
-cloneCard(
-frenchCards[1]
-),
-
-cloneCard(
-frenchCards[2]
-),
-
-cloneCard(
-frenchCards[3]
-),
-
-cloneCard(
-frenchCards[4]
-),
-
-cloneCard(
-frenchCards[5]
-),
-
-cloneCard(
-frenchCards[6]
-)
-
-];
-
-shuffle(playerDeck);
-shuffle(enemyDeck);
-
-/* STARTING HAND */
-
-for (
-let i = 0;
-i < 1;
-i++
-) {
-
-drawCard(
-playerDeck,
-playerHand
-);
-
-drawCard(
-enemyDeck,
-enemyHand
-);
-}
-
-renderBoard();
+  renderBoard();
 }
 
 /* =========================
@@ -323,7 +376,7 @@ deckCard.classList.add(
 );
 
 deckCard.innerHTML = `
-<div class="deck-back french-back">
+<div class="deck-back ${enemyNation.deckBackClass}">
 </div>
 `;
 
@@ -343,7 +396,7 @@ enemyHQ.classList.add(
 );
 
 enemyHQ.innerHTML = `
-<h2>Toulon</h2>
+<h2>${enemyNation.hqName}</h2>
 <p>HP: ${enemyFleetHP}</p>
 `;
 
@@ -362,6 +415,21 @@ enemyFrontline.length === 0
 
 enemyFleetHP -=
 selectedCard.damage;
+
+if (
+enemyFleetHP <= 0
+) {
+
+enemyFleetHP = 0;
+
+renderBoard();
+
+gameOver(
+playerNation.displayName
+);
+
+return;
+}
 
 selectedCard.hasAttacked =
 true;
@@ -389,7 +457,7 @@ playerHQ.classList.add(
 );
 
 playerHQ.innerHTML = `
-<h2>Scapa Flow</h2>
+<h2>${playerNation.hqName}</h2>
 <p>HP: ${playerFleetHP}</p>
 `;
 
@@ -634,35 +702,29 @@ el.classList.add(
 el.innerHTML = `
 
 <div class="cost">
-
-${
-zone === "hand"
-? card.deployCost
-: card.attackCost
-}
-
+${zone === "hand" ? card.deployCost : card.attackCost}
 </div>
+
+${card.submerged ? `<div class="submerged-badge">S</div>` : ""}
 
 <h3>${card.name}</h3>
 
-<p>ATK: ${card.damage}</p>
-
-<p>DEF: ${card.currentDefense}</p>
-
-<p>${card.ability}</p>
+${
+  card.type === "ability"
+    ? `<p style="margin-top:20px; font-size:13px;">${card.ability}</p>`
+    : `
+      <p>ATK: ${card.damage}</p>
+      <p>DEF: ${card.currentDefense}</p>
+      <p>${card.ability}</p>
+    `
+}
 
 ${
-owner === "player"
-&&
-zone !== "frontline"
-
-? `
-<button class="advance-btn">
-Advance
-</button>
-`
-
-: ""
+  owner === "player" && zone === "hand" && card.type === "ability"
+    ? `<button class="use-btn">USE</button>`
+    : (owner === "player" && zone !== "frontline" && card.type !== "ability"
+        ? `<button class="advance-btn">Advance</button>`
+        : "")
 }
 `;
 
@@ -695,6 +757,14 @@ e.stopPropagation();
 
 advanceCard(card);
 };
+}
+
+const useBtn = el.querySelector(".use-btn");
+if (useBtn) {
+  useBtn.onclick = (e) => {
+    e.stopPropagation();
+    useAbilityCard(card, "player");
+  };
 }
 
 return el;
@@ -753,7 +823,7 @@ card
    ADVANCE
 ========================= */
 
-function advanceCard(card) {
+async function advanceCard(card) {
 
 /* DEPLOY */
 
@@ -778,6 +848,80 @@ c => c !== card
 );
 
 playerSupport.push(card);
+
+if (card.name === "Le Terrible") {
+  const frontlineEmptyOrFriendly = playerFrontline.length === 0 || 
+    playerFrontline.some(s => s.nation === "France" || s.faction === "freefrench");
+  
+  if (frontlineEmptyOrFriendly && playerFrontline.length < 4) {
+    playerSupport = playerSupport.filter(c => c !== card);
+    playerFrontline.push(card);
+  }
+}
+
+if (card.name === "La Combattante") {
+  const hasFreeFrenchFront = playerFrontline.some(s => s.faction === "freefrench");
+  if (hasFreeFrenchFront) {
+    card.attackCost = 0;
+    card.damage = 2;
+    card.currentDefense = 2;
+    card.defense = 2;
+  }
+}
+
+if (card.name === "Surcouf") {
+  giveTorpedoStrike("player");
+}
+
+/*Prince of Wales*/
+if (card.name === "HMS Prince of Wales") {
+  // Show the big centered reveal
+  await showAbilityCard(card, 3200);
+
+  // Critical Hit! – halve the defense of the enemy battleship with highest defense
+  const enemyShips = [...enemySupport, ...enemyFrontline];
+  const battleships = enemyShips.filter(s => 
+    s.defense >= 8 || s.name.includes("Richelieu") || s.name.includes("Jean Bart") || 
+    s.name.includes("Dunkerque") || s.name.includes("Strasbourg") || s.name.includes("Hood") || 
+    s.name.includes("Warspite") || s.name.includes("Vanguard")
+  );
+
+  if (battleships.length > 0) {
+    battleships.sort((a, b) => b.currentDefense - a.currentDefense);
+    const target = battleships[0];
+    target.currentDefense = Math.ceil(target.currentDefense / 2);
+  }
+}
+
+/*HMS Edinburgh*/
+if (card.name === "HMS Edinburgh") {
+  // A Royal Treasurer – restore all energy spent this turn
+  // Simple version: set energy back to the current turn value
+  playerEnergy = turn;
+}
+
+/* GLOIRE */
+
+if (
+card.name ===
+"Gloire"
+&&
+playerFrontline.length > 0
+) {
+
+playerFrontline[0]
+.currentDefense += 1;
+}
+
+/* LE MALIN */
+
+if (
+card.name ===
+"Le Malin"
+) {
+
+playerEnergy += 1;
+}
 
 /* MOHAWK */
 
@@ -916,9 +1060,27 @@ return;
 
 /* TO FRONTLINE */
 
+if (card.name === "Casabianca") {
+  enemySupport.forEach(ship => {
+    ship.currentDefense -= 2;
+  });
+  cleanupDestroyed();
+}
+
 if (
 playerSupport.includes(card)
 ) {
+
+   if (
+playerEnergy <
+card.attackCost
+) {
+
+return;
+}
+
+playerEnergy -=
+card.attackCost;
 
 if (
 card.hasActed
@@ -930,7 +1092,7 @@ return;
 }
 
 if (
-playerFrontline.length >= 5
+playerFrontline.length >= 4
 ) {
 
 return;
@@ -951,6 +1113,20 @@ c => c !== card
 );
 
 playerFrontline.push(card);
+
+/* LE TRIOMPHANT */
+
+if (
+card.name ===
+"Le Triomphant"
+&&
+!card.usedAbility
+) {
+
+card.usedAbility = true;
+
+playerEnergy += 1;
+}
 
 /* WARSPITE */
 
@@ -1015,6 +1191,13 @@ attacker,
 defender
 ) {
 
+if (attacker.name === "Lorraine" && enemyFrontline.includes(defender)) {
+  if (enemySupport.length > 0) {
+    const randomIndex = Math.floor(Math.random() * enemySupport.length);
+    enemySupport[randomIndex].currentDefense -= 2;
+  }
+}
+
 if (
 attacker.hasAttacked
 ||
@@ -1040,6 +1223,9 @@ attacker
 )
 &&
 !attacker.carrier
+&&
+attacker.name !==
+"Surcouf"
 &&
 !enemyFrontline.includes(
 defender
@@ -1071,79 +1257,84 @@ attacker.attackCost;
 
 /* DAMAGE */
 
-let damage =
-attacker.damage;
+let damage = attacker.damage;
+
+/* ALGERIE */
+if (
+  attacker.name === "Algérie" &&
+  (enemySupport.includes(defender) || playerSupport.includes(defender))
+) {
+  damage += 2;
+}
 
 /* WARSPITE */
-
-if (
-defender.name ===
-"HMS Warspite"
-) {
-
-damage =
-Math.ceil(
-damage / 2
-);
+if (defender.name === "HMS Warspite") {
+  damage = Math.ceil(damage / 2);
 }
 
-defender.currentDefense -=
-damage;
+/* DUNKERQUE */
+if (defender.name === "Dunkerque") {
+  attacker.currentDefense -= 4;
+}
 
 /* GRAFTON INTERCEPT */
+let actualDefender = defender;
 
-let actualDefender =
-defender;
-
-const grafton =
-[
-...playerSupport,
-...playerFrontline
-].find(ship => {
-
-return (
-ship.name ===
-"HMS Grafton"
-&&
-ship !== defender
-&&
-ship.destroyer
-);
+const grafton = [...playerSupport, ...playerFrontline].find(ship => {
+  return (
+    ship.name === "HMS Grafton" &&
+    ship !== defender &&
+    ship.destroyer
+  );
 });
 
-if (
-grafton
-&&
-defender.destroyer
-) {
-
-actualDefender =
-grafton;
+if (grafton && defender.destroyer) {
+  actualDefender = grafton;
 }
 
-actualDefender.currentDefense -=
-damage;
+// ===== DAMAGE + SUBMERGED / DESTROYER LOGIC =====
+let finalDamage = damage;
+let returnDamage = defender.damage;
 
-/* GlOWWORM ABILITY */
-
-if (
-attacker.name ===
-"HMS Glowworm"
-) {
-
-attacker.currentDefense = 0;
-
-defender.currentDefense -= 3;
+// Destroyer vs submerged submarine → double damage + break submerged
+if (attacker.destroyer && defender.submerged) {
+  finalDamage = damage * 2;
+  defender.submerged = false;
+}
+// First hit on a submerged ship does 0 damage and removes submerged
+else if (defender.submerged && !defender._submergedHitThisTurn) {
+  finalDamage = 0;
+  defender._submergedHitThisTurn = true;
+  defender.submerged = false;
 }
 
-/* CARRIER */
+// Apply the (possibly modified) damage
+actualDefender.currentDefense -= finalDamage;
 
+/* GLOWWORM ABILITY */
+if (attacker.name === "HMS Glowworm") {
+  attacker.currentDefense = 0;
+  defender.currentDefense -= 3;
+}
+
+/* LE VAUTOUR */
 if (
-!attacker.carrier
+  attacker.name === "Le Vautour" &&
+  playerFrontline.includes(attacker)
 ) {
-
-attacker.currentDefense -=
-defender.damage;
+  playerFrontline = playerFrontline.filter(c => c !== attacker);
+  playerSupport.push(attacker);
+} else if (!attacker.carrier) {
+  // Return damage rules
+  if (attacker.submarine) {
+    // Submarines only take return damage from destroyers
+    if (defender.destroyer) {
+      attacker.currentDefense -= returnDamage;
+    }
+  } else {
+    // Normal ships take full return damage
+    attacker.currentDefense -= returnDamage;
+  }
 }
 
 if (
@@ -1162,6 +1353,45 @@ attacker.damage = 4;
 
 attacker.hasAttacked =
 true;
+/* BEARN */
+
+if (
+attacker.name ===
+"Béarn"
+) {
+
+const candidates =
+NATIONS.france.cards.filter(ship =>
+
+ship.faction ===
+"freefrench"
+
+&&
+
+ship.deployCost <= 3
+);
+
+if (
+candidates.length > 0
+) {
+
+const randomShip =
+cloneCard(
+
+candidates[
+Math.floor(
+Math.random() *
+candidates.length
+)
+]
+);
+
+enemyHand.push(
+randomShip
+);
+}
+}
+
 }
 
 if (
@@ -1179,7 +1409,50 @@ attacker.hasActed =
 true;
 }
 
+/* GEORGES LEYGUES */
+
+if (
+attacker.name ===
+"Georges Leygues"
+&&
+defender.currentDefense <= 0
+) {
+
+if (
+playerFrontline.includes(
+attacker
+)
+||
+playerSupport.includes(
+attacker
+)
+) {
+
+playerEnergy += 2;
+
+} else {
+
+enemyEnergy += 2;
+}
+}
+
 cleanupDestroyed();
+
+/* STRASBOURG */
+
+if (
+attacker.name ===
+"Strasbourg"
+&&
+defender.currentDefense <= 0
+) {
+
+attacker.hasAttacked =
+false;
+
+attacker.hasActed =
+false;
+}
 
 /* COSSAK ABILITY */
 if (
@@ -1306,6 +1579,26 @@ if (
 ship.currentDefense <= 0
 ) {
 
+/* SURCOUF */
+
+if (
+ship.name ===
+"Surcouf"
+&&
+ship.currentDefense <= 0
+) {
+
+zone.forEach(target => {
+
+if (
+target !== ship
+) {
+
+target.currentDefense -= 3;
+}
+});
+}
+
 /* ABDIEL */
 
 if (
@@ -1321,6 +1614,18 @@ enemySupport.forEach(enemy => {
 
 enemy.currentDefense -= 1;
 });
+}
+
+//* HMAS NEPAL */
+if (ship.name === "HMAS Nepal") {
+  const copy = cloneCard(
+    NATIONS.britain.cards.find(c => c.name === "HMAS Nepal")
+  );
+  if (playerSupport.includes(ship) || playerFrontline.includes(ship)) {
+    if (playerHand.length < 6) playerHand.push(copy);
+  } else {
+    if (enemyHand.length < 6) enemyHand.push(copy);
+  }
 }
 
 /* EXETER */
@@ -1340,6 +1645,62 @@ ship.damage += 3;
 
 continue;
 }
+/* MOGADOR */
+
+if (
+ship.name ===
+"Mogador"
+) {
+
+if (
+playerSupport.includes(ship)
+||
+playerFrontline.includes(ship)
+) {
+
+enemyHand.push(
+cloneCard(ship)
+);
+
+} else {
+
+playerHand.push(
+cloneCard(ship)
+);
+}
+}
+
+/* HMS PORCUPINE */
+if (ship.name === "HMS Porcupine") {
+  const pork = cloneCard({
+    name: "HMS Pork",
+    rarity: "common",
+    nation: "Britain",
+    damage: 1,
+    defense: 1,
+    deployCost: 1,
+    attackCost: 0,
+    ability: "Fragment"
+  });
+  const pine = cloneCard({
+    name: "HMS Pine",
+    rarity: "common",
+    nation: "Britain",
+    damage: 1,
+    defense: 1,
+    deployCost: 1,
+    attackCost: 0,
+    ability: "Fragment"
+  });
+
+  if (playerSupport.includes(ship) || playerFrontline.includes(ship)) {
+    if (playerHand.length < 6) playerHand.push(pork);
+    if (playerHand.length < 6) playerHand.push(pine);
+  } else {
+    if (enemyHand.length < 6) enemyHand.push(pork);
+    if (enemyHand.length < 6) enemyHand.push(pine);
+  }
+}
 
 zone.splice(i, 1);
 }
@@ -1354,6 +1715,25 @@ zone.splice(i, 1);
 function resetShips(
 zones
 ) {
+
+function resetShips(zones) {
+  zones.forEach(zone => {
+    zone.forEach(ship => {
+      ship._submergedHitThisTurn = false;
+
+      ship.hasAttacked = false;
+      ship.summoningSick = false;
+      ship.hasActed = false;
+      ship.usedFastBonus = false;
+      ship.turnsDeployed++;
+      ship.extraAttackUsed = false;
+
+      if (ship.name === "HMS Hood") {
+        ship.damage = 9;
+      }
+    });
+  });
+}
 
 zones.forEach(zone => {
 
@@ -1391,354 +1771,232 @@ ship.damage = 9;
    AI TURN
 ========================= */
 
-function enemyTurn() {
+async function enemyTurn() {
 
-/* DEPLOY */
-
-for (
-let i = enemyHand.length - 1;
-i >= 0;
-i--
-) {
-
-const card =
-enemyHand[i];
-
-if (
-enemyEnergy >=
-card.deployCost
-) {
-
-enemyEnergy -=
-card.deployCost;
-
-enemySupport.push(card);
-
-card.hasActed =
-true;
-
-enemyHand.splice(i, 1);
-}
+   // First play any ability cards
+for (let i = enemyHand.length - 1; i >= 0; i--) {
+  const card = enemyHand[i];
+  if (card.type === "ability" && enemyEnergy >= card.deployCost) {
+    await useAbilityCard(card, "enemy");
+    await wait(800);
+  }
 }
 
-/* MOVE */
+// Then normal ships
+for (let i = enemyHand.length - 1; i >= 0; i--) {
+  const card = enemyHand[i];
+  if (card.type === "ability") continue;   // already handled
 
-/* MOVE ONE SHIP */
+  if (enemyEnergy >= card.deployCost) {
+    enemyEnergy -= card.deployCost;
+    enemySupport.push(card);
+    card.hasActed = true;
+    enemyHand.splice(i, 1);
 
-for (
-let i = 0;
-i < enemySupport.length;
-i++
-) {
+    if (card.name === "Surcouf") {
+      giveTorpedoStrike("enemy");
+    }
 
-const card =
-enemySupport[i];
-
-if (
-card.carrier
-) {
-
-continue;
+    renderBoard();
+    await wait(700);
+  }
 }
 
-if (
-enemyEnergy < 1
-) {
+  // --- DEPLOY ---
+  for (let i = enemyHand.length - 1; i >= 0; i--) {
+    const card = enemyHand[i];
 
-break;
+    if (enemyEnergy >= card.deployCost) {
+      enemyEnergy -= card.deployCost;
+      enemySupport.push(card);
+      if (card.name === "Surcouf") {
+  giveTorpedoStrike("enemy");
 }
-
-if (
-enemyFrontline.length >= 5
-) {
-
-break;
-}
-
-if (
-playerFrontline.length > 0
-&&
-enemyFrontline.length === 0
-) {
-
-break;
-}
-
-enemyEnergy -= 1;
-
-enemySupport.splice(i, 1);
-
-enemyFrontline.push(card);
-
-if (
-!card.fast
-) {
-
-card.hasActed =
-true;
-}
-
-break;
-}
-
-/* ATTACK */
-
-enemyFrontline.forEach(card => {
-
-if (
-card.hasAttacked
-||
-card.summoningSick
-) {
-
-return;
-}
-
-if (
-enemyEnergy <
-card.attackCost
-) {
-
-return;
-}
-
-enemyEnergy -=
-card.attackCost;
-
-if (
-playerFrontline.length > 0
-) {
-
-const target =
-playerFrontline[0];
-
-target.currentDefense -=
-card.damage;
-
-if (
-!card.carrier
-) {
-
-card.currentDefense -=
-target.damage;
-}
-
-} else if (
-playerSupport.length > 0
-) {
-
-const target =
-playerSupport[0];
-
-target.currentDefense -=
-card.damage;
-
-if (
-!card.carrier
-) {
-
-card.currentDefense -=
-target.damage;
-}
-
-} else {
-
-playerFleetHP -=
-card.damage;
-}
-
-card.hasAttacked =
-true;
-
-if (
-card.fast
-&&
-!card.usedFastBonus
-) {
-
-card.usedFastBonus =
-true;
-
-} else {
-
-card.hasActed =
-true;
-}
-});
-
-/* SUPPORT ATTACKS */
-
-enemySupport.forEach(card => {
-
-if (
-card.carrier
-) {
-
-return;
-}
-
-if (
-card.hasAttacked
-||
-card.summoningSick
-||
-card.hasActed
-) {
-
-return;
-}
-
-if (
-enemyEnergy <
-card.attackCost
-) {
-
-return;
-}
-
-/* SUPPORT CAN ONLY
-ATTACK FRONTLINE */
-
-if (
-playerFrontline.length === 0
-) {
-
-return;
-}
-
-enemyEnergy -=
-card.attackCost;
-
-const target =
-playerFrontline[0];
-
-target.currentDefense -=
-card.damage;
-
-card.currentDefense -=
-target.damage;
-
-card.hasAttacked =
-true;
-
-if (
-card.fast
-&&
-!card.usedFastBonus
-) {
-
-card.usedFastBonus =
-true;
-
-} else {
-
-card.hasActed =
-true;
-}
-});
-
-/* CARRIERS */
-
-enemySupport.forEach(card => {
-
-if (
-!card.carrier
-) {
-
-return;
-}
-
-if (
-enemyEnergy <
-card.attackCost
-) {
-
-return;
-}
-
-enemyEnergy -=
-card.attackCost;
-
-if (
-playerFrontline.length > 0
-) {
-
-playerFrontline[0]
-.currentDefense -=
-card.damage;
-
-} else if (
-playerSupport.length > 0
-) {
-
-playerSupport[0]
-.currentDefense -=
-card.damage;
-}
-
-card.hasAttacked =
-true;
-});
-
-cleanupDestroyed();
-
-/* DRAW */
-
-drawCard(
-enemyDeck,
-enemyHand
-);
+      card.hasActed = true;
+      enemyHand.splice(i, 1);
+
+      renderBoard();
+      await wait(700);           // pause so you can see the deploy
+    }
+  }
+
+  // --- ADVANCE one ship ---
+  for (let i = 0; i < enemySupport.length; i++) {
+    const card = enemySupport[i];
+
+    if (card.carrier) continue;
+    if (enemyEnergy < card.attackCost) break;
+    if (enemyFrontline.length >= 4) break;
+    if (playerFrontline.length > 0 && enemyFrontline.length === 0) break;
+
+    enemyEnergy -= card.attackCost;
+    enemySupport.splice(i, 1);
+    enemyFrontline.push(card);
+
+    if (!card.fast) card.hasActed = true;
+
+    renderBoard();
+    await wait(800);
+    break;
+  }
+
+  // --- ATTACKS (frontline) ---
+  for (const card of [...enemyFrontline]) {
+    if (card.hasAttacked || card.summoningSick) continue;
+    if (enemyEnergy < card.attackCost) continue;
+
+    enemyEnergy -= card.attackCost;
+
+    let target = null;
+
+    if (playerFrontline.length > 0) {
+      target = playerFrontline[0];
+    } else if (playerSupport.length > 0) {
+      target = playerSupport[0];
+    } else {
+      // attack HQ
+      playerFleetHP -= card.damage;
+      if (playerFleetHP <= 0) {
+        playerFleetHP = 0;
+        cleanupDestroyed();
+        renderBoard();
+        gameOver(enemyNation.displayName);
+        return;
+      }
+      card.hasAttacked = true;
+      renderBoard();
+      await wait(600);
+      continue;
+    }
+
+    // visual pop
+    await highlightAttack(card, target);
+
+    target.currentDefense -= card.damage;
+    if (!card.carrier) {
+      card.currentDefense -= target.damage;
+    }
+
+    card.hasAttacked = true;
+    if (card.fast && !card.usedFastBonus) {
+      card.usedFastBonus = true;
+    } else {
+      card.hasActed = true;
+    }
+
+    cleanupDestroyed();
+    renderBoard();
+    await wait(700);
+  }
+
+  // --- SUPPORT ATTACKS ---
+  for (const card of [...enemySupport]) {
+    if (card.carrier) continue;
+    if (card.hasAttacked || card.summoningSick || card.hasActed) continue;
+    if (enemyEnergy < card.attackCost) continue;
+    if (playerFrontline.length === 0) continue;
+
+    enemyEnergy -= card.attackCost;
+    const target = playerFrontline[0];
+
+    await highlightAttack(card, target);
+
+    target.currentDefense -= card.damage;
+    if (!card.carrier) {
+      card.currentDefense -= target.damage;
+    }
+
+    card.hasAttacked = true;
+    renderBoard();
+    await wait(700);
+  }
+
+  // --- CARRIERS ---
+  for (const card of [...enemySupport]) {
+    if (!card.carrier) continue;
+    if (enemyEnergy < card.attackCost) continue;
+
+    enemyEnergy -= card.attackCost;
+
+    if (playerFrontline.length > 0) {
+      playerFrontline[0].currentDefense -= card.damage;
+    } else if (playerSupport.length > 0) {
+      playerSupport[0].currentDefense -= card.damage;
+    }
+
+    card.hasAttacked = true;
+    renderBoard();
+    await wait(600);
+  }
+
+  cleanupDestroyed();
+  drawCard(enemyDeck, enemyHand);
+  renderBoard();
 }
 
 /* =========================
    END TURN
 ========================= */
 
-endTurnBtn.onclick = () => {
+endTurnBtn.onclick = async () => {
+  if (currentTurn !== "player") return;
 
-if (
-currentTurn !== "player"
-) {
+  currentTurn = "enemy";
+  endTurnBtn.disabled = true;
 
-return;
-}
+  enemyEnergy = turn;
+  resetShips([enemySupport, enemyFrontline]);
 
-currentTurn = "enemy";
+  await enemyTurn();          // waits for the whole AI turn to finish
 
-/* ENEMY */
+  // Next player turn
+  turn++;
+  playerEnergy = turn;
+  resetShips([playerSupport, playerFrontline]);
+  drawCard(playerDeck, playerHand);
 
-enemyEnergy = turn;
-
-resetShips([
-enemySupport,
-enemyFrontline
-]);
-
-enemyTurn();
-
-/* NEXT TURN */
-
-turn++;
-
-playerEnergy = turn;
-
-resetShips([
-playerSupport,
-playerFrontline
-]);
-
-drawCard(
-playerDeck,
-playerHand
-);
-
-currentTurn = "player";
-
-renderBoard();
+  currentTurn = "player";
+  endTurnBtn.disabled = false;
+  renderBoard();
 };
 
-/* =========================
-   START
-========================= */
+function gameOver(winner) {
 
-startGame();
+const overlay =
+document.createElement("div");
+
+overlay.id =
+"game-over-overlay";
+
+overlay.innerHTML = `
+
+<div id="game-over-box">
+
+<h1>GAME OVER</h1>
+
+<h2>${winner} Wins!</h2>
+
+<button id="restart-btn">
+Restart
+</button>
+
+</div>
+
+`;
+
+document.body.appendChild(
+overlay
+);
+
+document.getElementById("restart-btn").onclick = () => {
+  location.reload();
+
+};
+
+currentTurn = "gameover";
+
+endTurnBtn.disabled = true;
+
+}
+
+startGame("britain", "france");
