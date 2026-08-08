@@ -1999,4 +1999,20 @@ endTurnBtn.disabled = true;
 
 }
 
-startGame("britain", "france");
+/*Screen*/
+// ===== START SCREEN LOGIC =====
+document.getElementById("start-btn").onclick = () => {
+  document.getElementById("start-screen").style.display = "none";
+  document.getElementById("nation-select").style.display = "block";
+};
+
+document.getElementById("select-britain").onclick = () => {
+  document.getElementById("nation-select").style.display = "none";
+  document.getElementById("game-screen").style.display = "block";
+  startGame("britain", "france");
+};
+
+// France is disabled for now
+document.getElementById("select-france").onclick = (e) => {
+  e.preventDefault();
+};

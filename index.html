@@ -1,127 +1,100 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
-<meta charset="UTF-8">
-
-<meta
-name="viewport"
-content="width=device-width, initial-scale=1.0"
-/>
-
-<title>
-Naval Card Game
-</title>
-
-<link
-rel="stylesheet"
-href="style.css"
-/>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Naval Card Game</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
+    
+  <!-- ========== START / LOADING SCREEN ========== -->
+  <div id="start-screen">
+    <h1>Naval Card Game</h1>
+    <div class="ship-name">HMS Javelin</div>
 
-<h1>
-Naval Card Game
-</h1>
+    <img src="HMS_Javelin_stern_damage.png" alt="HMS Javelin" class="fact-image" onerror="this.style.display='none'">
 
-<div id="top-bar">
+    <div class="ship-fact-text">
+      HMS Javelin was a J-class destroyer built by John Brown & Company and commissioned in June 1939. 
+      She displaced 1,690 long tons and carried six 4.7-inch guns in three turrets plus twelve secondary guns. 
+      In November 1940, while on patrol in the English Channel, she was torpedoed by the German destroyer Z10. 
+      Both her bow and stern were blown off, leaving only 155 feet of her original 356-foot hull still afloat. 
+      She was towed back to port and fully repaired by late 1941.
+    </div>
 
-<div id="turn-display">
-Turn 1
+    <button id="start-btn">Start Game</button>
+  </div>
+
+ <!-- ========== NATION SELECT SCREEN ========== -->
+<div id="nation-select" style="display: none;">
+  <h1>Choose Your Nation</h1>
+
+  <div class="nation-buttons">
+    <!-- BRITAIN - uses the exact same style as British ship cards -->
+    <div class="nation-card" id="select-britain">
+      <div class="card britain" style="width: 180px; height: 260px; cursor: pointer;">
+        <h2 style="margin-top: 100px; color: white; text-shadow: 0 0 8px black;">Great Britain</h2>
+      </div>
+    </div>
+
+    <!-- FRANCE -->
+    <div class="nation-card disabled" id="select-france">
+      <div class="card france freefrench" style="width: 180px; height: 260px; position: relative;">
+        <h2 style="margin-top: 100px; color: white; text-shadow: 0 0 8px black;">France</h2>
+        <div class="coming-soon">IN TESTING</div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<button id="end-turn">
-END TURN
-</button>
+  <!-- ========== ACTUAL GAME ========== -->
+  <div id="game-screen" style="display: none;">
 
-</div>
+    <h1>Naval Card Game</h1>
 
-<div class="battlefield">
+    <div id="top-bar">
+      <div id="turn-display">Turn 1</div>
+      <button id="end-turn">END TURN</button>
+    </div>
 
-<!-- ENEMY -->
+    <div class="battlefield">
 
-<div class="zone">
+      <!-- ENEMY -->
+      <div class="zone">
+        <h2>Enemy Deck</h2>
+        <div id="enemy-deck" class="deck-zone"></div>
+      </div>
 
-<h2>
-Enemy Deck
-</h2>
+      <div class="zone">
+        <h2>Enemy Support Line</h2>
+        <div id="enemy-energy">Energy: 0</div>
+        <div id="enemy-support" class="battle-row"></div>
+      </div>
 
-<div
-id="enemy-deck"
-class="deck-zone"
-></div>
+      <!-- FRONTLINE -->
+      <div class="zone">
+        <h2>Frontline</h2>
+        <div id="frontline" class="battle-row"></div>
+      </div>
 
-</div>
+      <!-- PLAYER -->
+      <div class="zone">
+        <h2>Player Support Line</h2>
+        <div id="player-energy">Energy: 1</div>
+        <div id="player-support" class="battle-row"></div>
+      </div>
 
-<div class="zone">
+      <div class="zone">
+        <h2>Your Hand</h2>
+        <div id="player-hand" class="hand-row"></div>
+      </div>
 
-<h2>
-Enemy Support Line
-</h2>
-<div id="enemy-energy">
-Energy: 0
-</div>
+    </div>
+  </div>
+  
 
-<div
-id="enemy-support"
-class="battle-row"
-></div>
-
-</div>
-
-<!-- PLAYER -->
-
-<div class="zone">
-
-<h2>
-Frontline
-</h2>
-
-<div
-id="frontline"
-class="battle-row"
-></div>
-
-</div>
-
-<div class="zone">
-
-<h2>
-Player Support Line
-</h2>
-<div id="player-energy">
-Energy: 1
-</div>
-
-<div
-id="player-support"
-class="battle-row"
-></div>
-
-</div>
-
-<div class="zone">
-
-<h2>
-Your Hand
-</h2>
-
-<div
-id="player-hand"
-class="hand-row"
-></div>
-
-</div>
-
-</div>
-
-<script src="nation.js"></script>
-<script src="game.js"></script>
-
+  <script src="nation.js"></script>
+  <script src="game.js"></script>
 </body>
-
 </html>
