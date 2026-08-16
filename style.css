@@ -423,6 +423,24 @@ cursor: pointer;
   z-index: 5;
 }
 
+.defended-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  background: #2e7d32;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #81c784;
+  z-index: 5;
+}
+
 /* ===== START SCREEN ===== */
 #start-screen {
   min-height: 100vh;
@@ -595,4 +613,26 @@ cursor: pointer;
   border-radius: 6px;
   font-size: 18px;
   pointer-events: none;
+}
+
+.british-back {
+  background-image:
+    linear-gradient(rgba(10, 20, 40, 0.82), rgba(10, 20, 40, 0.82)),
+    url("https://upload.wikimedia.org/wikipedia/en/a/ae/Flag_of_the_United_Kingdom.svg");
+  background-size: cover;
+  background-position: center;
+  border: 3px solid gold;
+}
+
+.french-back {
+  background: linear-gradient(
+    90deg,
+    #1b4db3 0%,
+    #1b4db3 33%,
+    #ffffff 33%,
+    #ffffff 66%,
+    #d62828 66%,
+    #d62828 100%
+  );
+  border: 3px solid gold;
 }

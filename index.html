@@ -7,46 +7,42 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    
+
   <!-- ========== START / LOADING SCREEN ========== -->
-  <div id="start-screen">
-    <h1>Naval Card Game</h1>
-    <div class="ship-name">HMS Javelin</div>
+<div id="start-screen">
+  <h1>Naval Card Game</h1>
 
-    <img src="HMS_Javelin_stern_damage.png" alt="HMS Javelin" class="fact-image" onerror="this.style.display='none'">
+  <div class="ship-name" id="fact-ship-name">HMS Javelin</div>
 
-    <div class="ship-fact-text">
-      HMS Javelin was a J-class destroyer built by John Brown & Company and commissioned in June 1939. 
-      She displaced 1,690 long tons and carried six 4.7-inch guns in three turrets plus twelve secondary guns. 
-      In November 1940, while on patrol in the English Channel, she was torpedoed by the German destroyer Z10. 
-      Both her bow and stern were blown off, leaving only 155 feet of her original 356-foot hull still afloat. 
-      She was towed back to port and fully repaired by late 1941.
-    </div>
+  <img id="fact-image" src="HMS_Javelin_stern_damage.png" alt="Ship" class="fact-image" onerror="this.style.display='none'">
 
-    <button id="start-btn">Start Game</button>
+  <div class="ship-fact-text" id="fact-text">
+    Loading fact...
   </div>
 
- <!-- ========== NATION SELECT SCREEN ========== -->
-<div id="nation-select" style="display: none;">
-  <h1>Choose Your Nation</h1>
-
-  <div class="nation-buttons">
-    <!-- BRITAIN - uses the exact same style as British ship cards -->
-    <div class="nation-card" id="select-britain">
-      <div class="card britain" style="width: 180px; height: 260px; cursor: pointer;">
-        <h2 style="margin-top: 100px; color: white; text-shadow: 0 0 8px black;">Great Britain</h2>
-      </div>
-    </div>
-
-    <!-- FRANCE -->
-    <div class="nation-card disabled" id="select-france">
-      <div class="card france freefrench" style="width: 180px; height: 260px; position: relative;">
-        <h2 style="margin-top: 100px; color: white; text-shadow: 0 0 8px black;">France</h2>
-        <div class="coming-soon">IN TESTING</div>
-      </div>
-    </div>
-  </div>
+  <button id="start-btn">Start Game</button>
 </div>
+
+  <!-- ========== NATION SELECT SCREEN ========== -->
+  <div id="nation-select" style="display: none;">
+    <h1>Choose Your Nation</h1>
+
+    <div class="nation-buttons">
+      <!-- BRITAIN -->
+      <div class="nation-card" id="select-britain">
+        <div class="card britain" style="width: 180px; height: 260px; cursor: pointer;">
+          <h2 style="margin-top: 100px; color: white; text-shadow: 0 0 8px black;">Great Britain</h2>
+        </div>
+      </div>
+
+      <!-- FRANCE -->
+      <div class="nation-card" id="select-france">
+        <div class="card france freefrench" style="width: 180px; height: 260px; cursor: pointer;">
+          <h2 style="margin-top: 100px; color: white; text-shadow: 0 0 8px black;">France</h2>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ========== ACTUAL GAME ========== -->
   <div id="game-screen" style="display: none;">
@@ -92,7 +88,6 @@
 
     </div>
   </div>
-  
 
   <script src="nation.js"></script>
   <script src="game.js"></script>

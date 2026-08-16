@@ -181,6 +181,37 @@ function showAbilityCard(card, duration = 2800) {
   });
 }
 
+function updateDefendedStatus() {
+  // Clear all defended flags first
+  [...playerSupport, ...playerFrontline, ...enemySupport, ...enemyFrontline].forEach(ship => {
+    ship.defended = false;
+    ship.defender = null;
+  });
+
+  function applyGuard(zone) {
+    for (let i = 0; i < zone.length; i++) {
+      const ship = zone[i];
+      if (!ship.guard) continue;
+
+      // Protect the ship to the left
+      if (i > 0) {
+        zone[i - 1].defended = true;
+        zone[i - 1].defender = ship;
+      }
+      // Protect the ship to the right
+      if (i < zone.length - 1) {
+        zone[i + 1].defended = true;
+        zone[i + 1].defender = ship;
+      }
+    }
+  }
+
+  applyGuard(playerSupport);
+  applyGuard(playerFrontline);
+  applyGuard(enemySupport);
+  applyGuard(enemyFrontline);
+}
+
 /* =========================
    DOM
 ========================= */
@@ -375,9 +406,10 @@ deckCard.classList.add(
 "card"
 );
 
+const backClass = enemyNation.deckBackClass || (enemyNation.id === "britain" ? "british-back" : "french-back");
+
 deckCard.innerHTML = `
-<div class="deck-back ${enemyNation.deckBackClass}">
-</div>
+  <div class="deck-back ${backClass}"></div>
 `;
 
 enemyDeckEl.appendChild(
@@ -594,7 +626,12 @@ card,
 )
 );
 });
+// ... all the existing renderBoard code ...
+
+updateDefendedStatus();   // ← must be the last thing before the function ends
+
 }
+
 
 /* =========================
    CARD CREATION
@@ -706,7 +743,7 @@ ${zone === "hand" ? card.deployCost : card.attackCost}
 </div>
 
 ${card.submerged ? `<div class="submerged-badge">S</div>` : ""}
-
+${card.defended ? `<div class="defended-badge">D</div>` : ""}
 <h3>${card.name}</h3>
 
 ${
@@ -853,6 +890,16 @@ if (card.name === "Le Terrible") {
   const frontlineEmptyOrFriendly = playerFrontline.length === 0 || 
     playerFrontline.some(s => s.nation === "France" || s.faction === "freefrench");
   
+  if (frontlineEmptyOrFriendly && playerFrontline.length < 4) {
+    playerSupport = playerSupport.filter(c => c !== card);
+    playerFrontline.push(card);
+  }
+}
+
+if (card.name === "Le Fantasque") {
+  const frontlineEmptyOrFriendly = playerFrontline.length === 0 ||
+    playerFrontline.every(s => s.nation === "France" || s.faction === "freefrench");
+
   if (frontlineEmptyOrFriendly && playerFrontline.length < 4) {
     playerSupport = playerSupport.filter(c => c !== card);
     playerFrontline.push(card);
@@ -1308,6 +1355,11 @@ else if (defender.submerged && !defender._submergedHitThisTurn) {
   defender.submerged = false;
 }
 
+// Defended redirection
+if (actualDefender.defended && actualDefender.defender) {
+  actualDefender = actualDefender.defender;
+}
+
 // Apply the (possibly modified) damage
 actualDefender.currentDefense -= finalDamage;
 
@@ -1712,15 +1764,10 @@ zone.splice(i, 1);
    RESET
 ========================= */
 
-function resetShips(
-zones
-) {
-
 function resetShips(zones) {
   zones.forEach(zone => {
     zone.forEach(ship => {
       ship._submergedHitThisTurn = false;
-
       ship.hasAttacked = false;
       ship.summoningSick = false;
       ship.hasActed = false;
@@ -1735,37 +1782,6 @@ function resetShips(zones) {
   });
 }
 
-zones.forEach(zone => {
-
-zone.forEach(ship => {
-
-ship.hasAttacked =
-false;
-
-ship.summoningSick =
-false;
-
-ship.hasActed =
-false;
-
-ship.usedFastBonus =
-false;
-
-ship.turnsDeployed++;
-
-ship.extraAttackUsed =
-false;
-
-if (
-ship.name ===
-"HMS Hood"
-) {
-
-ship.damage = 9;
-}
-});
-});
-}
 
 /* =========================
    AI TURN
@@ -2000,19 +2016,64 @@ endTurnBtn.disabled = true;
 }
 
 /*Screen*/
-// ===== START SCREEN LOGIC =====
-document.getElementById("start-btn").onclick = () => {
-  document.getElementById("start-screen").style.display = "none";
-  document.getElementById("nation-select").style.display = "block";
-};
+// ===== START SCREEN & NATION SELECT LOGIC =====
+window.addEventListener("DOMContentLoaded", () => {
+  const startBtn = document.getElementById("start-btn");
+  const selectBritain = document.getElementById("select-britain");
+  const selectFrance = document.getElementById("select-france");
 
-document.getElementById("select-britain").onclick = () => {
-  document.getElementById("nation-select").style.display = "none";
-  document.getElementById("game-screen").style.display = "block";
-  startGame("britain", "france");
-};
+  if (startBtn) {
+    startBtn.onclick = () => {
+      document.getElementById("start-screen").style.display = "none";
+      document.getElementById("nation-select").style.display = "block";
+    };
+  }
 
-// France is disabled for now
-document.getElementById("select-france").onclick = (e) => {
-  e.preventDefault();
-};
+  if (selectBritain) {
+    selectBritain.onclick = () => {
+      document.getElementById("nation-select").style.display = "none";
+      document.getElementById("game-screen").style.display = "block";
+      startGame("britain", "france");
+    };
+  }
+
+  if (selectFrance) {
+    selectFrance.onclick = () => {
+      document.getElementById("nation-select").style.display = "none";
+      document.getElementById("game-screen").style.display = "block";
+      startGame("france", "britain");
+    };
+  }
+});
+
+// ===== RANDOM SHIP FACT =====
+const shipFacts = [
+  {
+    name: "HMS Javelin",
+    image: "HMS_Javelin_stern_damage.png",
+    text: `HMS Javelin was a J-class destroyer built by John Brown & Company and commissioned in June 1939. 
+    She displaced 1,690 long tons and carried six 4.7-inch guns in three turrets plus twelve secondary guns. 
+    In November 1940, while on patrol in the English Channel, she was torpedoed by the German destroyer Z10. 
+    Both her bow and stern were blown off, leaving only 155 feet of her original 356-foot hull still afloat. 
+    She was towed back to port and fully repaired by late 1941.`
+  },
+  {
+    name: "Jean Bart",
+    image: "Jean_Bart_Morroco.jpg",
+    text: `Jean Bart was a Richelieu-class battleship laid down at the Chantiers de Penhoët shipyard in Saint-Nazaire in December 1936. 
+    Still incomplete when Germany invaded France in 1940, she made a daring escape. Using bilge pumps and tugs to deepen the channel, 
+    the unfinished battleship slipped out of the shipyard and sailed to Casablanca. She is remembered as one of the most dramatic 
+    escapes of an incomplete capital ship in the Second World War.`
+  }
+];
+
+function loadRandomFact() {
+  const fact = shipFacts[Math.floor(Math.random() * shipFacts.length)];
+  document.getElementById("fact-ship-name").textContent = fact.name;
+  document.getElementById("fact-image").src = fact.image;
+  document.getElementById("fact-image").alt = fact.name;
+  document.getElementById("fact-text").textContent = fact.text;
+}
+
+// Call it when the page loads
+loadRandomFact();

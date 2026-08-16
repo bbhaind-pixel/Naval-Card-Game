@@ -302,7 +302,8 @@ window.NATIONS = {
         deployCost: 2,
         attackCost: 1,
         destroyer: true,
-        ability: "Escort"
+        ability: "Escort",
+        guard: true
       },
       {
         name: "Georges Leygues",
